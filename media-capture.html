@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="ur" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SnapClip Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080a0f;
+    --surface: #0e1117;
+    --card: #13171f;
+    --border: #1e2433;
+    --accent: #00e5ff;
+    --accent2: #ff4081;
+    --accent3: #69ff47;
+    --text: #e8eaf0;
+    --muted: #5a6480;
+    --glow: 0 0 20px rgba(0,229,255,0.3);
+    --glow2: 0 0 20px rgba(255,64,129,0.3);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background grid */
+  body::before {
+    content:'';
+    position:fixed;
+    inset:0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events:none;
+    z-index:0;
+  }
+
+  /* Noise overlay */
+  body::after {
+    content:'';
+    position:fixed;
+    inset:0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events:none;
+    z-index:0;
+    opacity:0.5;
+  }
+
+  .wrap { position:relative; z-index:1; max-width:960px; margin:0 auto; padding:20px; }
+
+  /* Header */
+  header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:24px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom:32px;
+  }
+  .logo {
+    font-family:'Syne',sans-serif;
+    font-size:1.8rem;
+    font-weight:800;
+    letter-spacing:-1px;
+  }
+  .logo span { color:var(--accent); }
+  .logo em { color:var(--accent2); font-style:normal; }
+
+  .status-bar {
+    display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+  }
+  .status-pill {
+    display:flex; align-items:center; gap:6px;
+    padding:5px 12px;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:999px;
+    font-size:0.7rem;
+    letter-spacing:0.05em;
+    color:var(--muted);
+    transition:all 0.3s;
+  }
+  .status-pill.granted { border-color:var(--accent3); color:var(--accent3); }
+  .status-pill.denied { border-color:var(--accent2); color:var(--accent2); }
+  .status-dot {
+    width:6px; height:6px; border-radius:50%;
+    background:var(--muted);
+    transition:all 0.3s;
+  }
+  .status-pill.granted .status-dot { background:var(--accent3); box-shadow:0 0 6px var(--accent3); }
+  .status-pill.denied .status-dot { background:var(--accent2); box-shadow:0 0 6px var(--accent2); }
+
+  /* Permission overlay */
+  #permission-overlay {
+    position:fixed; inset:0;
+    background:rgba(8,10,15,0.97);
+    z-index:1000;
+    display:flex; align-items:center; justify-content:center;
+    backdrop-filter:blur(10px);
+  }
+  .perm-card {
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:48px;
+    max-width:480px;
+    width:90%;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+  }
+  .perm-card::before {
+    content:'';
+    position:absolute;
+    top:-50%; left:-50%; width:200%; height:200%;
+    background:conic-gradient(from 0deg, transparent 0%, rgba(0,229,255,0.05) 25%, transparent 50%);
+    animation:spin 8s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .perm-icon {
+    font-size:3rem; margin-bottom:20px;
+    animation:pulse 2s ease infinite;
+  }
+  @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+  .perm-card h2 {
+    font-family:'Syne',sans-serif;
+    font-size:1.6rem;
+    font-weight:800;
+    margin-bottom:12px;
+    position:relative;
+  }
+  .perm-card p {
+    color:var(--muted);
+    font-size:0.8rem;
+    line-height:1.7;
+    margin-bottom:32px;
+    position:relative;
+  }
+  .perm-items {
+    display:flex; flex-direction:column; gap:10px;
+    margin-bottom:32px;
+    text-align:left;
+    position:relative;
+  }
+  .perm-item {
+    display:flex; align-items:center; gap:12px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px 16px;
+    font-size:0.78rem;
+  }
+  .perm-item .perm-ico { font-size:1.2rem; }
+  .btn-allow {
+    width:100%;
+    padding:16px;
+    background:var(--accent);
+    color:#000;
+    border:none;
+    border-radius:10px;
+    font-family:'Syne',sans-serif;
+    font-size:1rem;
+    font-weight:700;
+    cursor:pointer;
+    position:relative;
+    letter-spacing:0.5px;
+    transition:all 0.2s;
+    box-shadow:var(--glow);
+  }
+  .btn-allow:hover { transform:translateY(-2px); box-shadow:0 0 30px rgba(0,229,255,0.5); }
+  .btn-allow:active { transform:translateY(0); }
+
+  /* Main grid */
+  .main-grid {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+  }
+  @media(max-width:700px) { .main-grid { grid-template-columns:1fr; } }
+
+  /* Panels */
+  .panel {
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    overflow:hidden;
+    transition:border-color 0.3s;
+  }
+  .panel:hover { border-color:rgba(0,229,255,0.2); }
+  .panel-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 20px;
+    border-bottom:1px solid var(--border);
+    background:rgba(0,0,0,0.2);
+  }
+  .panel-title {
+    font-family:'Syne',sans-serif;
+    font-size:0.85rem;
+    font-weight:700;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+  .panel-badge {
+    font-size:0.65rem;
+    padding:3px 8px;
+    border-radius:999px;
+    border:1px solid var(--accent);
+    color:var(--accent);
+  }
+  .panel-body { padding:20px; }
+
+  /* Camera */
+  .camera-wrap {
+    position:relative;
+    width:100%;
+    aspect-ratio:4/3;
+    background:#000;
+    border-radius:10px;
+    overflow:hidden;
+    margin-bottom:16px;
+  }
+  #video-preview {
+    width:100%; height:100%;
+    object-fit:cover;
+    display:block;
+  }
+  .camera-overlay {
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,0.7);
+    flex-direction:column; gap:10px;
+    font-size:0.8rem; color:var(--muted);
+  }
+  .camera-overlay .big-icon { font-size:2.5rem; }
+
+  /* Corner brackets */
+  .corner { position:absolute; width:20px; height:20px; }
+  .corner.tl { top:10px; left:10px; border-top:2px solid var(--accent); border-left:2px solid var(--accent); }
+  .corner.tr { top:10px; right:10px; border-top:2px solid var(--accent); border-right:2px solid var(--accent); }
+  .corner.bl { bottom:10px; left:10px; border-bottom:2px solid var(--accent); border-left:2px solid var(--accent); }
+  .corner.br { bottom:10px; right:10px; border-bottom:2px solid var(--accent); border-right:2px solid var(--accent); }
+
+  /* REC indicator */
+  .rec-indicator {
+    position:absolute; top:12px; left:50%; transform:translateX(-50%);
+    display:flex; align-items:center; gap:6px;
+    background:rgba(0,0,0,0.7);
+    padding:4px 12px; border-radius:999px;
+    font-size:0.65rem; letter-spacing:0.1em;
+    color:var(--accent2);
+    opacity:0; transition:opacity 0.3s;
+  }
+  .rec-indicator.active { opacity:1; }
+  .rec-dot { width:6px; height:6px; border-radius:50%; background:var(--accent2); animation:blink 1s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* Location badge on camera */
+  #location-badge {
+    position:absolute; bottom:10px; left:10px;
+    background:rgba(0,0,0,0.75);
+    padding:5px 10px; border-radius:6px;
+    font-size:0.65rem; color:var(--accent3);
+    border:1px solid rgba(105,255,71,0.3);
+    display:none;
+  }
+  #location-badge.show { display:block; }
+
+  /* Buttons */
+  .btn-group { display:flex; gap:10px; flex-wrap:wrap; }
+  .btn {
+    flex:1; padding:12px;
+    border:1px solid var(--border);
+    border-radius:10px;
+    background:var(--surface);
+    color:var(--text);
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.78rem;
+    cursor:pointer;
+    transition:all 0.2s;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .btn:hover { border-color:var(--accent); color:var(--accent); box-shadow:var(--glow); }
+  .btn.primary { background:var(--accent); color:#000; border-color:var(--accent); font-weight:600; }
+  .btn.primary:hover { box-shadow:0 0 25px rgba(0,229,255,0.5); transform:translateY(-1px); }
+  .btn.danger { border-color:var(--accent2); color:var(--accent2); }
+  .btn.danger:hover { background:rgba(255,64,129,0.1); box-shadow:var(--glow2); }
+  .btn.success { border-color:var(--accent3); color:var(--accent3); }
+  .btn.success:hover { background:rgba(105,255,71,0.1); }
+  .btn:disabled { opacity:0.3; cursor:not-allowed; transform:none !important; box-shadow:none !important; }
+
+  /* Audio visualizer */
+  .audio-viz {
+    width:100%;
+    height:80px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:10px;
+    overflow:hidden;
+    margin-bottom:16px;
+    position:relative;
+  }
+  #audio-canvas { width:100%; height:100%; }
+  .audio-idle {
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--muted); font-size:0.75rem; gap:8px;
+  }
+
+  /* Photos grid */
+  .photos-grid {
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:8px;
+    margin-bottom:16px;
+    min-height:80px;
+  }
+  .photo-thumb {
+    aspect-ratio:4/3;
+    border-radius:8px;
+    overflow:hidden;
+    border:1px solid var(--border);
+    position:relative;
+    cursor:pointer;
+    transition:all 0.2s;
+  }
+  .photo-thumb:hover { border-color:var(--accent); transform:scale(1.03); }
+  .photo-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .photo-thumb .del-btn {
+    position:absolute; top:4px; right:4px;
+    background:rgba(255,64,129,0.8);
+    border:none; color:#fff;
+    width:18px; height:18px;
+    border-radius:50%; cursor:pointer;
+    font-size:10px;
+    display:none; align-items:center; justify-content:center;
+  }
+  .photo-thumb:hover .del-btn { display:flex; }
+  .no-photos {
+    grid-column:1/-1;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--muted); font-size:0.75rem; gap:8px;
+    padding:20px;
+  }
+
+  /* Timer */
+  .rec-timer {
+    font-family:'Syne',sans-serif;
+    font-size:1.2rem;
+    font-weight:700;
+    color:var(--accent2);
+    text-align:center;
+    margin-bottom:12px;
+    display:none;
+  }
+  .rec-timer.active { display:block; }
+
+  /* Output panel */
+  .output-panel {
+    grid-column:1/-1;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    overflow:hidden;
+  }
+  .output-inner { padding:20px; }
+  .output-video-wrap {
+    width:100%;
+    aspect-ratio:16/9;
+    background:#000;
+    border-radius:10px;
+    overflow:hidden;
+    margin-bottom:16px;
+    display:flex; align-items:center; justify-content:center;
+    position:relative;
+  }
+  #output-video { width:100%; height:100%; display:none; }
+  .output-placeholder {
+    display:flex; flex-direction:column; align-items:center; gap:12px;
+    color:var(--muted); font-size:0.8rem;
+  }
+  .output-placeholder .big { font-size:3rem; }
+  .progress-bar {
+    width:100%; height:4px;
+    background:var(--border);
+    border-radius:2px;
+    overflow:hidden;
+    margin-bottom:16px;
+    display:none;
+  }
+  .progress-fill {
+    height:100%;
+    background:linear-gradient(90deg, var(--accent), var(--accent2));
+    width:0%;
+    transition:width 0.3s;
+    border-radius:2px;
+  }
+
+  /* Toast */
+  #toast {
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--card);
+    border:1px solid var(--border);
+    padding:12px 24px;
+    border-radius:10px;
+    font-size:0.78rem;
+    opacity:0; transition:all 0.3s;
+    z-index:9999;
+    white-space:nowrap;
+  }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  #toast.success-t { border-color:var(--accent3); color:var(--accent3); }
+  #toast.error-t { border-color:var(--accent2); color:var(--accent2); }
+
+  /* Hidden canvas for processing */
+  #proc-canvas { display:none; }
+
+  /* Info bar */
+  .info-bar {
+    display:flex; gap:16px; flex-wrap:wrap;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:14px 20px;
+    margin-bottom:20px;
+    font-size:0.72rem;
+    color:var(--muted);
+  }
+  .info-item { display:flex; align-items:center; gap:6px; }
+  .info-item span { color:var(--text); }
+
+  .sep { height:1px; background:var(--border); margin:20px 0; }
+</style>
+</head>
+<body>
+
+<!-- Permission Overlay -->
+<div id="permission-overlay">
+  <div class="perm-card">
+    <div class="perm-icon">🎬</div>
+    <h2>SnapClip Studio</h2>
+    <p>Ye app aapki camera, microphone aur location use karti hai taake aap ek khoobsurat video clip bana sakein.</p>
+    <div class="perm-items">
+      <div class="perm-item"><span class="perm-ico">📷</span><div><strong>Camera</strong><br><small style="color:var(--muted)">Photos aur video recording ke liye</small></div></div>
+      <div class="perm-item"><span class="perm-ico">🎙️</span><div><strong>Microphone</strong><br><small style="color:var(--muted)">Audio recording ke liye</small></div></div>
+      <div class="perm-item"><span class="perm-ico">📍</span><div><strong>Location</strong><br><small style="color:var(--muted)">Video mein location stamp ke liye</small></div></div>
+    </div>
+    <button class="btn-allow" onclick="requestAllPermissions()">✅ &nbsp; Sab Allow Karo</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Hidden canvas -->
+<canvas id="proc-canvas"></canvas>
+
+<div class="wrap">
+  <header>
+    <div class="logo">Snap<span>Clip</span> <em>Studio</em></div>
+    <div class="status-bar">
+      <div class="status-pill" id="pill-cam"><div class="status-dot"></div>Camera</div>
+      <div class="status-pill" id="pill-mic"><div class="status-dot"></div>Mic</div>
+      <div class="status-pill" id="pill-loc"><div class="status-dot"></div>Location</div>
+    </div>
+  </header>
+
+  <div class="info-bar">
+    <div class="info-item">📸 Photos: <span id="info-photos">0</span></div>
+    <div class="info-item">⏱️ Recording: <span id="info-rec">--:--</span></div>
+    <div class="info-item">📍 Location: <span id="info-loc">Detecting...</span></div>
+    <div class="info-item">🕐 Time: <span id="info-time">--</span></div>
+  </div>
+
+  <div class="main-grid">
+
+    <!-- Camera Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">📷 Camera</div>
+        <div class="panel-badge" id="cam-status-badge">OFFLINE</div>
+      </div>
+      <div class="panel-body">
+        <div class="camera-wrap">
+          <video id="video-preview" autoplay muted playsinline></video>
+          <div class="camera-overlay" id="cam-overlay">
+            <div class="big-icon">📷</div>
+            <div>Camera start hogi...</div>
+          </div>
+          <div class="corner tl"></div>
+          <div class="corner tr"></div>
+          <div class="corner bl"></div>
+          <div class="corner br"></div>
+          <div class="rec-indicator" id="rec-indicator">
+            <div class="rec-dot"></div> REC
+          </div>
+          <div id="location-badge">📍 —</div>
+        </div>
+        <div class="btn-group">
+          <button class="btn primary" id="btn-photo" onclick="capturePhoto()" disabled>📸 Photo Lo</button>
+          <button class="btn" id="btn-flip" onclick="flipCamera()" disabled>🔄 Flip</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Audio Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">🎙️ Audio</div>
+        <div class="panel-badge" id="audio-status-badge">IDLE</div>
+      </div>
+      <div class="panel-body">
+        <div class="audio-viz">
+          <canvas id="audio-canvas"></canvas>
+          <div class="audio-idle" id="audio-idle">🎵 &nbsp; Audio visualizer</div>
+        </div>
+        <div class="rec-timer" id="rec-timer">00:00</div>
+        <div class="btn-group">
+          <button class="btn primary" id="btn-rec-start" onclick="startRecording()" disabled>⏺ Recording Shuru</button>
+          <button class="btn danger" id="btn-rec-stop" onclick="stopRecording()" disabled>⏹ Rokein</button>
+        </div>
+        <div class="sep"></div>
+        <div class="panel-title" style="margin-bottom:12px">📸 Li Gayi Photos</div>
+        <div class="photos-grid" id="photos-grid">
+          <div class="no-photos">📷 Koi photo nahi</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Output Panel -->
+    <div class="output-panel">
+      <div class="panel-header">
+        <div class="panel-title">🎬 Video Clip</div>
+        <div class="panel-badge" id="output-badge">READY</div>
+      </div>
+      <div class="output-inner">
+        <div class="output-video-wrap">
+          <video id="output-video" controls></video>
+          <div class="output-placeholder" id="output-placeholder">
+            <div class="big">🎬</div>
+            <div>Recording karo aur clip banao</div>
+            <div style="font-size:0.68rem">Photos + Audio → Video Clip</div>
+          </div>
+        </div>
+        <div class="progress-bar" id="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <div class="btn-group">
+          <button class="btn primary" id="btn-make-clip" onclick="makeClip()" disabled>✨ Clip Banao</button>
+          <button class="btn success" id="btn-download" onclick="downloadClip()" disabled>⬇️ Download</button>
+          <button class="btn danger" id="btn-reset" onclick="resetAll()">🗑️ Reset</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────
+let stream = null;
+let facingMode = 'user';
+let audioStream = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let audioCtx = null, analyser = null, animFrame = null;
+let recTimerInterval = null;
+let recSeconds = 0;
+let photos = []; // [{dataUrl, timestamp, location}]
+let locationData = { lat:null, lng:null, city:'Detecting...' };
+let finalVideoBlob = null;
+let recordedAudioBlob = null;
+
+// ─── Permission Flow ─────────────────────────────────────
+async function requestAllPermissions() {
+  try {
+    const overlay = document.getElementById('permission-overlay');
+    overlay.querySelector('.btn-allow').textContent = '⏳  Permissions mil rahi hain...';
+    overlay.querySelector('.btn-allow').disabled = true;
+
+    // Camera + Mic
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode }, audio: true
+    });
+    audioStream = new MediaStream(stream.getAudioTracks());
+
+    const vid = document.getElementById('video-preview');
+    vid.srcObject = stream;
+    vid.onloadedmetadata = () => vid.play();
+    document.getElementById('cam-overlay').style.display = 'none';
+    document.getElementById('cam-status-badge').textContent = 'LIVE';
+    document.getElementById('cam-status-badge').style.color = 'var(--accent3)';
+
+    setPill('cam', 'granted');
+    setPill('mic', 'granted');
+
+    enableButtons();
+
+    // Location
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(async pos => {
+        locationData.lat = pos.coords.latitude.toFixed(5);
+        locationData.lng = pos.coords.longitude.toFixed(5);
+        locationData.city = `${locationData.lat}, ${locationData.lng}`;
+        try {
+          const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${locationData.lat}&lon=${locationData.lng}&format=json`);
+          const d = await r.json();
+          locationData.city = d.address.city || d.address.town || d.address.village || d.address.county || locationData.city;
+        } catch(e) {}
+        document.getElementById('info-loc').textContent = locationData.city;
+        const lb = document.getElementById('location-badge');
+        lb.textContent = `📍 ${locationData.city}`;
+        lb.classList.add('show');
+        setPill('loc', 'granted');
+      }, err => {
+        setPill('loc', 'denied');
+        document.getElementById('info-loc').textContent = 'Nahi mili';
+        showToast('Location nahi mili', 'error');
+      });
+    }
+
+    setupAudioVisualizer();
+    overlay.style.opacity = '0';
+    overlay.style.transition = 'opacity 0.5s';
+    setTimeout(() => overlay.style.display = 'none', 500);
+    showToast('Sab permissions mil gayi! 🎉', 'success');
+  } catch(e) {
+    showToast('Permission nahi mili: ' + e.message, 'error');
+    document.getElementById('permission-overlay').querySelector('.btn-allow').textContent = '🔄 Dobara Koshish Karo';
+    document.getElementById('permission-overlay').querySelector('.btn-allow').disabled = false;
+  }
+}
+
+function setPill(id, state) {
+  const el = document.getElementById('pill-' + id);
+  el.classList.remove('granted', 'denied');
+  el.classList.add(state);
+}
+
+function enableButtons() {
+  document.getElementById('btn-photo').disabled = false;
+  document.getElementById('btn-flip').disabled = false;
+  document.getElementById('btn-rec-start').disabled = false;
+}
+
+// ─── Clock ────────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById('info-time').textContent =
+    new Date().toLocaleTimeString('ur-PK');
+}, 1000);
+
+// ─── Camera ──────────────────────────────────────────────
+function capturePhoto() {
+  if (!stream) return;
+  const vid = document.getElementById('video-preview');
+  const canvas = document.getElementById('proc-canvas');
+  canvas.width = vid.videoWidth || 640;
+  canvas.height = vid.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+
+  // Mirror if front cam
+  if (facingMode === 'user') {
+    ctx.save();
+    ctx.scale(-1, 1);
+    ctx.drawImage(vid, -canvas.width, 0, canvas.width, canvas.height);
+    ctx.restore();
+  } else {
+    ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+  }
+
+  // Timestamp + location overlay
+  const ts = new Date().toLocaleString('ur-PK');
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, canvas.height - 44, canvas.width, 44);
+  ctx.fillStyle = '#69ff47';
+  ctx.font = 'bold 13px JetBrains Mono, monospace';
+  ctx.fillText(`📍 ${locationData.city}`, 10, canvas.height - 26);
+  ctx.fillStyle = '#00e5ff';
+  ctx.font = '11px JetBrains Mono, monospace';
+  ctx.fillText(ts, 10, canvas.height - 10);
+
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+  const photo = { dataUrl, timestamp: ts, location: locationData.city };
+  photos.push(photo);
+
+  updatePhotosGrid();
+  document.getElementById('info-photos').textContent = photos.length;
+  document.getElementById('btn-make-clip').disabled = false;
+
+  // Flash effect
+  const fl = document.createElement('div');
+  fl.style.cssText = 'position:absolute;inset:0;background:#fff;opacity:0.8;pointer-events:none;transition:opacity 0.4s;z-index:10;border-radius:10px;';
+  document.querySelector('.camera-wrap').appendChild(fl);
+  setTimeout(() => { fl.style.opacity = '0'; setTimeout(() => fl.remove(), 400); }, 50);
+
+  showToast('📸 Photo li gayi!', 'success');
+}
+
+async function flipCamera() {
+  facingMode = facingMode === 'user' ? 'environment' : 'user';
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = await navigator.mediaDevices.getUserMedia({ video:{facingMode}, audio:true });
+    document.getElementById('video-preview').srcObject = stream;
+    audioStream = new MediaStream(stream.getAudioTracks());
+    setupAudioVisualizer();
+  }
+}
+
+// ─── Audio Visualizer ────────────────────────────────────
+function setupAudioVisualizer() {
+  if (!audioStream) return;
+  if (audioCtx) audioCtx.close();
+  audioCtx = new AudioContext();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 128;
+  const src = audioCtx.createMediaStreamSource(audioStream);
+  src.connect(analyser);
+  drawVisualizer();
+}
+
+function drawVisualizer() {
+  const canvas = document.getElementById('audio-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+  const W = canvas.width, H = canvas.height;
+  const data = new Uint8Array(analyser ? analyser.frequencyBinCount : 64);
+
+  function draw() {
+    animFrame = requestAnimationFrame(draw);
+    if (analyser) analyser.getByteFrequencyData(data);
+    ctx.clearRect(0, 0, W, H);
+    const barW = W / data.length;
+    data.forEach((v, i) => {
+      const h = (v / 255) * H * 0.85;
+      const hue = 180 + (i / data.length) * 60;
+      ctx.fillStyle = `hsla(${hue}, 100%, 60%, 0.85)`;
+      ctx.fillRect(i * barW, H - h, barW - 1, h);
+    });
+  }
+  draw();
+  document.getElementById('audio-idle').style.display = 'none';
+}
+
+// ─── Recording ───────────────────────────────────────────
+function startRecording() {
+  if (!stream) return;
+  recordedChunks = [];
+  const options = { mimeType: getSupportedMime() };
+  mediaRecorder = new MediaRecorder(stream, options);
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = () => {
+    recordedAudioBlob = new Blob(recordedChunks, { type: options.mimeType });
+    document.getElementById('btn-make-clip').disabled = false;
+    showToast('🎤 Recording save ho gayi!', 'success');
+    document.getElementById('audio-status-badge').textContent = 'SAVED';
+    document.getElementById('audio-status-badge').style.color = 'var(--accent3)';
+  };
+  mediaRecorder.start(100);
+
+  document.getElementById('btn-rec-start').disabled = true;
+  document.getElementById('btn-rec-stop').disabled = false;
+  document.getElementById('rec-indicator').classList.add('active');
+  document.getElementById('audio-status-badge').textContent = 'REC';
+  document.getElementById('audio-status-badge').style.color = 'var(--accent2)';
+  document.getElementById('rec-timer').classList.add('active');
+
+  recSeconds = 0;
+  recTimerInterval = setInterval(() => {
+    recSeconds++;
+    const m = String(Math.floor(recSeconds/60)).padStart(2,'0');
+    const s = String(recSeconds%60).padStart(2,'0');
+    document.getElementById('rec-timer').textContent = `${m}:${s}`;
+    document.getElementById('info-rec').textContent = `${m}:${s}`;
+  }, 1000);
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+    clearInterval(recTimerInterval);
+    document.getElementById('btn-rec-start').disabled = false;
+    document.getElementById('btn-rec-stop').disabled = true;
+    document.getElementById('rec-indicator').classList.remove('active');
+    document.getElementById('rec-timer').classList.remove('active');
+  }
+}
+
+function getSupportedMime() {
+  const types = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4'];
+  return types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+}
+
+// ─── Photos Grid ─────────────────────────────────────────
+function updatePhotosGrid() {
+  const grid = document.getElementById('photos-grid');
+  if (photos.length === 0) {
+    grid.innerHTML = '<div class="no-photos">📷 Koi photo nahi</div>';
+    return;
+  }
+  grid.innerHTML = photos.map((p,i) => `
+    <div class="photo-thumb">
+      <img src="${p.dataUrl}" alt="Photo ${i+1}">
+      <button class="del-btn" onclick="deletePhoto(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+function deletePhoto(i) {
+  photos.splice(i, 1);
+  updatePhotosGrid();
+  document.getElementById('info-photos').textContent = photos.length;
+  if (photos.length === 0 && !recordedAudioBlob) {
+    document.getElementById('btn-make-clip').disabled = true;
+  }
+}
+
+// ─── Make Clip ───────────────────────────────────────────
+async function makeClip() {
+  if (photos.length === 0 && !recordedAudioBlob) {
+    showToast('Pehle photo lo ya recording karo!', 'error'); return;
+  }
+
+  document.getElementById('btn-make-clip').disabled = true;
+  document.getElementById('output-badge').textContent = 'PROCESSING';
+  document.getElementById('output-badge').style.color = 'var(--accent)';
+  const pb = document.getElementById('progress-bar');
+  const pf = document.getElementById('progress-fill');
+  pb.style.display = 'block';
+  pf.style.width = '0%';
+
+  showToast('✨ Clip ban rahi hai...', 'success');
+
+  const W = 1280, H = 720;
+  const canvas = document.getElementById('proc-canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  const canvasStream = canvas.captureStream(30);
+
+  // Add audio if we have it
+  let finalStream = canvasStream;
+  if (recordedAudioBlob) {
+    try {
+      const audioEl = new Audio(URL.createObjectURL(recordedAudioBlob));
+      const actx = new AudioContext();
+      const src2 = actx.createMediaElementSource(audioEl);
+      const dst = actx.createMediaStreamDestination();
+      src2.connect(dst);
+      src2.connect(actx.destination);
+      canvasStream.addTrack(dst.stream.getAudioTracks()[0]);
+      audioEl.play();
+    } catch(e) {}
+  }
+
+  const outChunks = [];
+  const outMime = getSupportedMime();
+  const outRecorder = new MediaRecorder(finalStream, { mimeType: outMime });
+  outRecorder.ondataavailable = e => { if(e.data.size > 0) outChunks.push(e.data); };
+
+  // How long to show each photo
+  const photoDuration = photos.length > 0 ? Math.max(2, Math.min(5, 20 / photos.length)) : 3;
+  const totalDuration = photos.length > 0 ? photos.length * photoDuration * 1000 : 3000;
+
+  outRecorder.start(100);
+
+  let startTime = Date.now();
+  let photoIndex = 0;
+  let imgObjects = [];
+
+  // Preload images
+  if (photos.length > 0) {
+    imgObjects = await Promise.all(photos.map(p => new Promise(res => {
+      const img = new Image(); img.onload = () => res(img); img.src = p.dataUrl;
+    })));
+  }
+
+  function drawFrame() {
+    const elapsed = Date.now() - startTime;
+    const progress = Math.min(elapsed / totalDuration, 1);
+    pf.style.width = (progress * 100) + '%';
+
+    // Background
+    ctx.fillStyle = '#080a0f';
+    ctx.fillRect(0, 0, W, H);
+
+    if (imgObjects.length > 0) {
+      const idx = Math.floor(elapsed / (photoDuration * 1000));
+      const clampedIdx = Math.min(idx, imgObjects.length - 1);
+      const img = imgObjects[clampedIdx];
+
+      // Ken Burns effect
+      const t = (elapsed % (photoDuration * 1000)) / (photoDuration * 1000);
+      const scale = 1 + t * 0.05;
+      const sw = W * scale, sh = H * scale;
+      const sx = (W - sw) / 2, sy = (H - sh) / 2;
+
+      ctx.drawImage(img, sx, sy, sw, sh);
+
+      // Fade between photos
+      if (t > 0.85) {
+        ctx.fillStyle = `rgba(8,10,15,${(t - 0.85) / 0.15})`;
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      // Photo counter
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(W - 100, 10, 88, 28);
+      ctx.fillStyle = '#00e5ff';
+      ctx.font = '14px JetBrains Mono, monospace';
+      ctx.fillText(`${clampedIdx+1} / ${imgObjects.length}`, W - 90, 29);
+    } else {
+      // No photos – just black with text
+      ctx.fillStyle = '#00e5ff';
+      ctx.font = 'bold 32px Syne, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('SnapClip Studio', W/2, H/2 - 20);
+      ctx.font = '18px JetBrains Mono, monospace';
+      ctx.fillStyle = '#5a6480';
+      ctx.fillText('Audio Recording', W/2, H/2 + 20);
+      ctx.textAlign = 'left';
+    }
+
+    // Bottom bar
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(0, H - 52, W, 52);
+
+    // Location
+    ctx.fillStyle = '#69ff47';
+    ctx.font = 'bold 14px JetBrains Mono, monospace';
+    ctx.fillText(`📍 ${locationData.city || 'Unknown Location'}`, 16, H - 30);
+
+    // Timestamp
+    ctx.fillStyle = '#00e5ff';
+    ctx.font = '12px JetBrains Mono, monospace';
+    ctx.fillText(new Date().toLocaleString('ur-PK'), 16, H - 12);
+
+    // Brand
+    ctx.fillStyle = '#ff4081';
+    ctx.font = 'bold 13px Syne, sans-serif';
+    const brand = 'SnapClip Studio';
+    ctx.fillText(brand, W - ctx.measureText(brand).width - 16, H - 20);
+
+    if (elapsed < totalDuration) {
+      requestAnimationFrame(drawFrame);
+    } else {
+      pf.style.width = '100%';
+      setTimeout(() => outRecorder.stop(), 300);
+    }
+  }
+
+  drawFrame();
+
+  outRecorder.onstop = () => {
+    finalVideoBlob = new Blob(outChunks, { type: outMime });
+    const url = URL.createObjectURL(finalVideoBlob);
+    const vid = document.getElementById('output-video');
+    vid.src = url;
+    vid.style.display = 'block';
+    document.getElementById('output-placeholder').style.display = 'none';
+    document.getElementById('btn-download').disabled = false;
+    document.getElementById('btn-make-clip').disabled = false;
+    document.getElementById('output-badge').textContent = 'DONE ✓';
+    document.getElementById('output-badge').style.color = 'var(--accent3)';
+    showToast('🎬 Clip tayyar hai! Download karo!', 'success');
+    pb.style.display = 'none';
+  };
+}
+
+function downloadClip() {
+  if (!finalVideoBlob) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(finalVideoBlob);
+  a.download = `snapclip_${Date.now()}.webm`;
+  a.click();
+  showToast('⬇️ Download shuru ho gayi!', 'success');
+}
+
+function resetAll() {
+  photos = [];
+  recordedAudioBlob = null;
+  finalVideoBlob = null;
+  recordedChunks = [];
+  recSeconds = 0;
+  clearInterval(recTimerInterval);
+
+  updatePhotosGrid();
+  document.getElementById('info-photos').textContent = '0';
+  document.getElementById('info-rec').textContent = '--:--';
+
+  const vid = document.getElementById('output-video');
+  vid.src = ''; vid.style.display = 'none';
+  document.getElementById('output-placeholder').style.display = 'flex';
+  document.getElementById('btn-download').disabled = true;
+  document.getElementById('btn-make-clip').disabled = true;
+  document.getElementById('output-badge').textContent = 'READY';
+  document.getElementById('output-badge').style.color = '';
+
+  document.getElementById('rec-timer').classList.remove('active');
+  document.getElementById('rec-timer').textContent = '00:00';
+  document.getElementById('rec-indicator').classList.remove('active');
+  document.getElementById('btn-rec-start').disabled = false;
+  document.getElementById('btn-rec-stop').disabled = true;
+  document.getElementById('audio-status-badge').textContent = 'IDLE';
+  document.getElementById('audio-status-badge').style.color = '';
+
+  showToast('🗑️ Sab reset ho gaya', 'success');
+}
+
+// ─── Toast ───────────────────────────────────────────────
+let toastTimeout;
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + (type === 'success' ? 'success-t' : 'error-t');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => t.className = '', 3000);
+}
+</script>
+</body>
+</html>
